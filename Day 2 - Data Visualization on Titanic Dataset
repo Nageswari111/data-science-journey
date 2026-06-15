@@ -1,0 +1,73 @@
+# Day 2 - Data Visualization on Titanic Dataset
+# Goal: Create 4 charts to understand who survived and why
+# Tools: Pandas, Matplotlib, Seaborn
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load Titanic dataset
+url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+df = pd.read_csv(url)
+
+print("Dataset loaded! Shape:", df.shape)
+
+# ── Chart 1: Survival Count ──────────────────────────────────
+plt.figure(figsize=(6, 4))
+df['Survived'].value_counts().plot(kind='bar', color=['#e74c3c', '#2ecc71'], edgecolor='black')
+plt.title('Survival Count (0 = Did Not Survive, 1 = Survived)')
+plt.xlabel('Survived')
+plt.ylabel('Number of Passengers')
+plt.xticks(rotation=0)
+plt.tight_layout()
+plt.savefig('chart1_survival_count.png')
+plt.show()
+print("Chart 1 saved!")
+
+# ── Chart 2: Survival by Gender ───────────────────────────────
+plt.figure(figsize=(6, 4))
+sns.countplot(data=df, x='Sex', hue='Survived', palette=['#e74c3c', '#2ecc71'])
+plt.title('Survival by Gender')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.legend(['Did Not Survive', 'Survived'])
+plt.tight_layout()
+plt.savefig('chart2_survival_by_gender.png')
+plt.show()
+print("Chart 2 saved!")
+
+# ── Chart 3: Survival by Passenger Class ─────────────────────
+plt.figure(figsize=(6, 4))
+sns.countplot(data=df, x='Pclass', hue='Survived', palette=['#e74c3c', '#2ecc71'])
+plt.title('Survival by Passenger Class (1=First, 2=Second, 3=Third)')
+plt.xlabel('Passenger Class')
+plt.ylabel('Count')
+plt.legend(['Did Not Survive', 'Survived'])
+plt.tight_layout()
+plt.savefig('chart3_survival_by_class.png')
+plt.show()
+print("Chart 3 saved!")
+
+# ── Chart 4: Age Distribution ─────────────────────────────────
+plt.figure(figsize=(8, 4))
+df[df['Survived'] == 1]['Age'].dropna().plot(kind='hist', bins=20, alpha=0.7, color='#2ecc71', label='Survived')
+df[df['Survived'] == 0]['Age'].dropna().plot(kind='hist', bins=20, alpha=0.7, color='#e74c3c', label='Did Not Survive')
+plt.title('Age Distribution: Survivors vs Non-Survivors')
+plt.xlabel('Age')
+plt.ylabel('Count')
+plt.legend()
+plt.tight_layout()
+plt.savefig('chart4_age_distribution.png')
+plt.show()
+print("Chart 4 saved!")
+
+# ── Key Insights ──────────────────────────────────────────────
+print("\n=== KEY INSIGHTS ===")
+print("\nSurvival rate by Gender:")
+print(df.groupby('Sex')['Survived'].mean().round(2))
+
+print("\nSurvival rate by Class:")
+print(df.groupby('Pclass')['Survived'].mean().round(2))
+
+print("\nAverage age of survivors:", round(df[df['Survived']==1]['Age'].mean(), 1))
+print("Average age of non-survivors:", round(df[df['Survived']==0]['Age'].mean(), 1))
