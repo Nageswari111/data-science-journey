@@ -1,0 +1,141 @@
+# Day 3 - SQL Practice with Python
+# Goal: Learn SQL queries using real data inside Python
+# Tools: Pandas, SQLite3 (built into Python - no install needed!)
+
+import pandas as pd
+import sqlite3
+
+# Load Titanic dataset
+url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+df = pd.read_csv(url)
+
+# ── Setup: Load CSV into a SQL database ──────────────────────
+conn = sqlite3.connect(':memory:')  # creates database in memory
+df.to_sql('titanic', conn, index=False, if_exists='replace')
+print("✅ Titanic data loaded into SQL database!")
+print(f"Total rows: {len(df)}\n")
+
+# ── Helper function to run SQL and print results ──────────────
+def run_sql(title, query):
+    print(f"=== {title} ===")
+    result = pd.read_sql_query(query, conn)
+    print(result.to_string(index=False))
+    print()
+    return result
+
+# ── Query 1: SELECT basics ────────────────────────────────────
+run_sql("Q1: First 5 passengers",
+"""
+SELECT Name, Age, Sex, Pclass, Survived
+FROM titanic
+LIMIT 5
+""")
+
+# ── Query 2: WHERE clause ─────────────────────────────────────
+run_sql("Q2: Female passengers who survived",
+"""
+SELECT Name, Age, Pclass
+FROM titanic
+WHERE Sex = 'female' AND Survived = 1
+LIMIT 10
+""")
+
+# ── Query 3: COUNT and GROUP BY ───────────────────────────────
+run_sql("Q3: How many passengers in each class?",
+"""
+SELECT Pclass, COUNT(*) AS total_passengers
+FROM titanic
+GROUP BY Pclass
+ORDER BY Pclass
+""")
+
+# ── Query 4: Survival rate by gender ─────────────────────────
+run_sql("Q4: Survival rate by gender (interview favourite!)",
+"""
+SELECT 
+    Sex,
+    COUNT(*) AS total,
+    SUM(Survived) AS survived,
+    ROUND(AVG(Survived) * 100, 1) AS survival_rate_percent
+FROM titanic
+GROUP BY Sex
+""")
+
+# ── Query 5: Survival rate by class ──────────────────────────
+run_sql("Q5: Survival rate by passenger class",
+"""
+SELECT 
+    Pclass,
+    COUNT(*) AS total,
+    SUM(Survived) AS survived,
+    ROUND(AVG(Survived) * 100, 1) AS survival_rate_percent
+FROM titanic
+GROUP BY Pclass
+ORDER BY Pclass
+""")
+
+# ── Query 6: Average age by class ────────────────────────────
+run_sql("Q6: Average age per passenger class",
+"""
+SELECT 
+    Pclass,
+    ROUND(AVG(Age), 1) AS avg_age,
+    MIN(Age) AS youngest,
+    MAX(Age) AS oldest
+FROM titanic
+WHERE Age IS NOT NULL
+GROUP BY Pclass
+""")
+
+# ── Query 7: HAVING clause ────────────────────────────────────
+run_sql("Q7: Classes with survival rate above 40% (HAVING)",
+"""
+SELECT 
+    Pclass,
+    ROUND(AVG(Survived) * 100, 1) AS survival_rate_percent
+FROM titanic
+GROUP BY Pclass
+HAVING AVG(Survived) > 0.40
+""")
+
+# ── Query 8: ORDER BY + LIMIT ─────────────────────────────────
+run_sql("Q8: Top 5 oldest survivors",
+"""
+SELECT Name, Age, Sex, Pclass
+FROM titanic
+WHERE Survived = 1 AND Age IS NOT NULL
+ORDER BY Age DESC
+LIMIT 5
+""")
+
+# ── Query 9: CASE WHEN (very common in interviews!) ───────────
+run_sql("Q9: Age groups using CASE WHEN",
+"""
+SELECT 
+    CASE 
+        WHEN Age < 18 THEN 'Child'
+        WHEN Age BETWEEN 18 AND 40 THEN 'Young Adult'
+        WHEN Age BETWEEN 41 AND 60 THEN 'Middle Aged'
+        ELSE 'Senior'
+    END AS age_group,
+    COUNT(*) AS total,
+    ROUND(AVG(Survived) * 100, 1) AS survival_rate_percent
+FROM titanic
+WHERE Age IS NOT NULL
+GROUP BY age_group
+""")
+
+# ── Query 10: Subquery ────────────────────────────────────────
+run_sql("Q10: Passengers older than average age (Subquery)",
+"""
+SELECT Name, Age, Sex, Pclass, Survived
+FROM titanic
+WHERE Age > (SELECT AVG(Age) FROM titanic WHERE Age IS NOT NULL)
+ORDER BY Age DESC
+LIMIT 8
+""")
+
+print("✅ All 10 SQL queries complete!")
+print("📌 Concepts covered: SELECT, WHERE, GROUP BY, HAVING, ORDER BY, CASE WHEN, Subquery")
+
+conn.close()
