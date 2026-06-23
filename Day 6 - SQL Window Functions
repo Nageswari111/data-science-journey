@@ -1,0 +1,207 @@
+# Day 6 - SQL Window Functions
+# Goal: Master the most asked advanced SQL in DA interviews
+# Tools: Pandas, SQLite3
+
+import pandas as pd
+import sqlite3
+
+# Load Titanic dataset
+url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+df = pd.read_csv(url)
+
+# Load into SQLite
+conn = sqlite3.connect(':memory:')
+df.to_sql('titanic', conn, index=False, if_exists='replace')
+print("✅ Data loaded into SQL!")
+print(f"Total rows: {len(df)}\n")
+
+# Helper function
+def run_sql(title, query):
+    print(f"\n{'='*50}")
+    print(f"  {title}")
+    print('='*50)
+    result = pd.read_sql_query(query, conn)
+    print(result.to_string(index=False))
+    return result
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 1: ROW_NUMBER()
+# Assigns a unique number to each row within a group
+# ══════════════════════════════════════════════════════════════
+run_sql("ROW_NUMBER: Rank passengers by fare within each class",
+"""
+SELECT 
+    Name,
+    Pclass,
+    Fare,
+    ROW_NUMBER() OVER (
+        PARTITION BY Pclass 
+        ORDER BY Fare DESC
+    ) AS fare_rank
+FROM titanic
+WHERE Fare IS NOT NULL
+ORDER BY Pclass, fare_rank
+LIMIT 12
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 2: RANK()
+# Same as ROW_NUMBER but ties get same rank
+# ══════════════════════════════════════════════════════════════
+run_sql("RANK: Rank passengers by age within gender",
+"""
+SELECT
+    Name,
+    Sex,
+    Age,
+    RANK() OVER (
+        PARTITION BY Sex
+        ORDER BY Age DESC
+    ) AS age_rank
+FROM titanic
+WHERE Age IS NOT NULL
+ORDER BY Sex, age_rank
+LIMIT 12
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 3: DENSE_RANK()
+# Like RANK but no gaps in ranking numbers
+# ══════════════════════════════════════════════════════════════
+run_sql("DENSE_RANK: Top 3 highest fares per class",
+"""
+SELECT * FROM (
+    SELECT
+        Name,
+        Pclass,
+        Fare,
+        DENSE_RANK() OVER (
+            PARTITION BY Pclass
+            ORDER BY Fare DESC
+        ) AS fare_rank
+    FROM titanic
+) ranked
+WHERE fare_rank <= 3
+ORDER BY Pclass, fare_rank
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 4: LAG()
+# Get value from previous row — used in trend analysis
+# ══════════════════════════════════════════════════════════════
+run_sql("LAG: Compare each passenger fare to previous passenger",
+"""
+SELECT
+    Name,
+    Pclass,
+    Fare,
+    LAG(Fare) OVER (
+        PARTITION BY Pclass
+        ORDER BY Fare DESC
+    ) AS previous_fare,
+    ROUND(Fare - LAG(Fare) OVER (
+        PARTITION BY Pclass
+        ORDER BY Fare DESC
+    ), 2) AS fare_difference
+FROM titanic
+WHERE Fare IS NOT NULL
+ORDER BY Pclass, Fare DESC
+LIMIT 12
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 5: LEAD()
+# Get value from next row
+# ══════════════════════════════════════════════════════════════
+run_sql("LEAD: Compare each fare to next passenger fare",
+"""
+SELECT
+    Name,
+    Pclass,
+    Fare,
+    LEAD(Fare) OVER (
+        PARTITION BY Pclass
+        ORDER BY Fare DESC
+    ) AS next_fare
+FROM titanic
+WHERE Fare IS NOT NULL
+ORDER BY Pclass, Fare DESC
+LIMIT 12
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 6: SUM() OVER — Running Total
+# Most asked in business analyst interviews!
+# ══════════════════════════════════════════════════════════════
+run_sql("Running Total: Cumulative fare collected per class",
+"""
+SELECT
+    Name,
+    Pclass,
+    Fare,
+    ROUND(SUM(Fare) OVER (
+        PARTITION BY Pclass
+        ORDER BY Fare DESC
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ), 2) AS running_total
+FROM titanic
+WHERE Fare IS NOT NULL
+ORDER BY Pclass, Fare DESC
+LIMIT 12
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 7: AVG() OVER — Moving Average
+# Used in sales trend analysis every day!
+# ══════════════════════════════════════════════════════════════
+run_sql("Moving Average: Average fare of current + 2 neighbours",
+"""
+SELECT
+    Name,
+    Pclass,
+    Fare,
+    ROUND(AVG(Fare) OVER (
+        PARTITION BY Pclass
+        ORDER BY Fare DESC
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ), 2) AS moving_avg_fare
+FROM titanic
+WHERE Fare IS NOT NULL
+ORDER BY Pclass, Fare DESC
+LIMIT 12
+""")
+
+# ══════════════════════════════════════════════════════════════
+# WINDOW FUNCTION 8: NTILE()
+# Divide rows into N equal buckets — used in percentile analysis
+# ══════════════════════════════════════════════════════════════
+run_sql("NTILE: Divide passengers into 4 fare quartiles",
+"""
+SELECT
+    Name,
+    Fare,
+    NTILE(4) OVER (ORDER BY Fare DESC) AS fare_quartile,
+    CASE NTILE(4) OVER (ORDER BY Fare DESC)
+        WHEN 1 THEN 'Top 25% (Expensive)'
+        WHEN 2 THEN 'Upper Middle'
+        WHEN 3 THEN 'Lower Middle'
+        WHEN 4 THEN 'Bottom 25% (Cheap)'
+    END AS fare_category
+FROM titanic
+WHERE Fare IS NOT NULL
+ORDER BY Fare DESC
+LIMIT 16
+""")
+
+print("\n✅ All 8 Window Functions complete!")
+print("\n📌 SUMMARY — Window Functions Cheat Sheet:")
+print("ROW_NUMBER()  → Unique rank, no ties")
+print("RANK()        → Rank with gaps for ties")
+print("DENSE_RANK()  → Rank without gaps for ties")
+print("LAG()         → Previous row value")
+print("LEAD()        → Next row value")
+print("SUM() OVER    → Running total")
+print("AVG() OVER    → Moving average")
+print("NTILE(n)      → Divide into n buckets")
+
+conn.close()
