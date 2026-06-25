@@ -1,0 +1,208 @@
+# Day 7 - Data Cleaning
+# Goal: Clean a messy real-world dataset like a professional DA
+# Tools: Pandas, NumPy, Matplotlib
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load dataset — Melbourne Housing (very messy, perfect for cleaning!)
+df = pd.read_csv("melb_data.csv")
+
+print("✅ Dataset loaded!")
+print(f"Shape: {df.shape}")
+print(f"\nFirst 3 rows:\n{df.head(3)}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 1: Understand the mess first
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 1: Understanding Missing Values")
+print("="*50)
+
+missing = df.isnull().sum()
+missing_pct = (df.isnull().sum() / len(df) * 100).round(2)
+missing_df = pd.DataFrame({
+    'Missing Count': missing,
+    'Missing %': missing_pct
+}).sort_values('Missing %', ascending=False)
+
+print(missing_df[missing_df['Missing Count'] > 0])
+
+print(f"\nDataset shape BEFORE cleaning: {df.shape}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 2: Fix missing values
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 2: Fixing Missing Values")
+print("="*50)
+
+# Numerical columns — fill with median (safer than mean)
+num_cols = ['Price', 'Rooms', 'Distance', 'Bedroom2',
+            'Bathroom', 'Car', 'Landsize', 'BuildingArea', 'YearBuilt']
+
+for col in num_cols:
+    if col in df.columns and df[col].isnull().sum() > 0:
+        median_val = df[col].median()
+        df[col] = df[col].fillna(median_val)
+        print(f"✅ {col}: filled with median ({median_val})")
+
+# Categorical columns — fill with mode (most common value)
+cat_cols = ['CouncilArea', 'Regionname']
+for col in cat_cols:
+    if col in df.columns and df[col].isnull().sum() > 0:
+        mode_val = df[col].mode()[0]
+        df[col] = df[col].fillna(mode_val)
+        print(f"✅ {col}: filled with mode ({mode_val})")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 3: Fix data types
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 3: Fixing Data Types")
+print("="*50)
+
+print("Before fixing:")
+print(df.dtypes)
+
+# Convert Date to datetime
+df['Date'] = pd.to_datetime(df['Date'], dayfirst=True)
+df['Year']  = df['Date'].dt.year
+df['Month'] = df['Date'].dt.month
+
+# Convert these to integers
+int_cols = ['Rooms', 'Bedroom2', 'Bathroom', 'Car', 'YearBuilt']
+for col in int_cols:
+    if col in df.columns:
+        df[col] = df[col].fillna(df[col].median())
+        df[col] = df[col].astype(int)
+
+print("\nAfter fixing:")
+print(df[['Date', 'Year', 'Month', 'Rooms', 'Price']].dtypes)
+
+# ══════════════════════════════════════════════════════════════
+# STEP 4: Remove duplicates
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 4: Removing Duplicates")
+print("="*50)
+
+dupes = df.duplicated().sum()
+print(f"Duplicate rows found: {dupes}")
+df.drop_duplicates(inplace=True)
+print(f"Shape after removing duplicates: {df.shape}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 5: Remove outliers using IQR method
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 5: Removing Outliers (IQR Method)")
+print("="*50)
+
+def remove_outliers(df, col):
+    Q1  = df[col].quantile(0.25)
+    Q3  = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+    before = len(df)
+    df = df[(df[col] >= lower) & (df[col] <= upper)]
+    print(f"  {col}: removed {before - len(df)} outliers (range: ${lower:,.0f} – ${upper:,.0f})")
+    return df
+
+df = remove_outliers(df, 'Price')
+df = remove_outliers(df, 'Landsize')
+df = remove_outliers(df, 'BuildingArea')
+
+print(f"\nShape after outlier removal: {df.shape}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 6: Feature engineering
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 6: Feature Engineering")
+print("="*50)
+
+# Price per room
+df['Price_Per_Room'] = (df['Price'] / df['Rooms']).round(2)
+
+# Property age
+df['Property_Age'] = 2024 - df['YearBuilt']
+
+# Price category
+df['Price_Category'] = pd.cut(df['Price'],
+    bins=[0, 500000, 1000000, 2000000, float('inf')],
+    labels=['Budget', 'Mid-range', 'Premium', 'Luxury'])
+
+print("New columns added:")
+print(df[['Price', 'Rooms', 'Price_Per_Room',
+          'Property_Age', 'Price_Category']].head(5))
+
+# ══════════════════════════════════════════════════════════════
+# STEP 7: Final check + save clean data
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 7: Final Check")
+print("="*50)
+
+print(f"Missing values remaining: {df.isnull().sum().sum()}")
+print(f"Final shape: {df.shape}")
+df.to_csv('melbourne_clean.csv', index=False)
+print("✅ Clean dataset saved as melbourne_clean.csv")
+
+# ══════════════════════════════════════════════════════════════
+# DASHBOARD: Before vs After cleaning
+# ══════════════════════════════════════════════════════════════
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Melbourne Housing — Data Cleaning Analysis',
+             fontsize=18, fontweight='bold')
+sns.set_style("whitegrid")
+
+# Chart 1: Price distribution after cleaning
+axes[0, 0].hist(df['Price'], bins=40, color='#3498db',
+                edgecolor='white', alpha=0.8)
+axes[0, 0].set_title('Price Distribution (After Cleaning)',
+                      fontweight='bold')
+axes[0, 0].set_xlabel('Price ($)')
+axes[0, 0].set_ylabel('Count')
+
+# Chart 2: Price by number of rooms
+room_price = df.groupby('Rooms')['Price'].median() / 1000
+axes[0, 1].bar(room_price.index, room_price.values,
+               color='#2ecc71', edgecolor='black')
+axes[0, 1].set_title('Median Price by Number of Rooms',
+                      fontweight='bold')
+axes[0, 1].set_xlabel('Rooms')
+axes[0, 1].set_ylabel('Median Price ($K)')
+
+# Chart 3: Price category distribution
+price_cat_counts = df['Price_Category'].value_counts()
+axes[1, 0].pie(price_cat_counts.values,
+               labels=price_cat_counts.index,
+               autopct='%1.1f%%',
+               colors=['#27ae60', '#f39c12', '#e74c3c', '#9b59b6'],
+               startangle=90)
+axes[1, 0].set_title('Property Price Categories', fontweight='bold')
+
+# Chart 4: Average price by region
+region_price = df.groupby('Regionname')['Price'].mean().sort_values() / 1000
+region_price.plot(kind='barh', ax=axes[1, 1], color='#e74c3c')
+axes[1, 1].set_title('Average Price by Region ($K)', fontweight='bold')
+axes[1, 1].set_xlabel('Average Price ($K)')
+
+plt.tight_layout()
+plt.savefig('cleaning_dashboard.png', dpi=150, bbox_inches='tight')
+plt.show()
+print("\n✅ Dashboard saved as cleaning_dashboard.png")
+
+# ── Cheat Sheet ───────────────────────────────────────────────
+print("\n📌 DATA CLEANING CHEAT SHEET:")
+print("isnull().sum()         → find missing values")
+print("fillna(median)         → fill numbers with median")
+print("fillna(mode()[0])      → fill categories with mode")
+print("drop_duplicates()      → remove duplicate rows")
+print("astype(int)            → fix data types")
+print("IQR method             → remove outliers safely")
+print("pd.cut()               → create categories from numbers")
