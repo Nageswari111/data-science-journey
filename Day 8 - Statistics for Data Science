@@ -1,0 +1,219 @@
+# Day 8 - Statistics for Data Science
+# Goal: Learn the statistics every interviewer asks about
+# Tools: Pandas, NumPy, Scipy, Matplotlib, Seaborn
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+
+# Load Melbourne clean dataset (from Day 7)
+# If you don't have it, we reload and clean quickly
+try:
+    df = pd.read_csv('melbourne_clean.csv')
+    print("✅ Loaded clean Melbourne dataset!")
+except:
+    url = "https://raw.githubusercontent.com/selva86/datasets/master/MelbourneHousing.csv"
+    df = pd.read_csv(url)
+    df['Price'].fillna(df['Price'].median(), inplace=True)
+    df['Rooms'].fillna(df['Rooms'].median(), inplace=True)
+    df['BuildingArea'].fillna(df['BuildingArea'].median(), inplace=True)
+    print("✅ Reloaded and cleaned Melbourne dataset!")
+
+print(f"Shape: {df.shape}\n")
+
+# ══════════════════════════════════════════════════════════════
+# CONCEPT 1: Measures of Central Tendency
+# Mean, Median, Mode — asked in every interview!
+# ══════════════════════════════════════════════════════════════
+print("="*50)
+print("CONCEPT 1: Central Tendency")
+print("="*50)
+
+price = df['Price'].dropna()
+
+mean_price   = price.mean()
+median_price = price.median()
+mode_price   = price.mode()[0]
+
+print(f"Mean Price   : ${mean_price:,.0f}")
+print(f"Median Price : ${median_price:,.0f}")
+print(f"Mode Price   : ${mode_price:,.0f}")
+print(f"\n💡 Mean > Median means data is RIGHT SKEWED")
+print(f"   (expensive houses pull the mean up)")
+
+# ══════════════════════════════════════════════════════════════
+# CONCEPT 2: Measures of Spread
+# Std, Variance, IQR, Range
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("CONCEPT 2: Spread / Variability")
+print("="*50)
+
+std_price  = price.std()
+var_price  = price.var()
+Q1         = price.quantile(0.25)
+Q3         = price.quantile(0.75)
+IQR        = Q3 - Q1
+range_price = price.max() - price.min()
+
+print(f"Standard Deviation : ${std_price:,.0f}")
+print(f"Variance           : ${var_price:,.0f}")
+print(f"IQR (Q3-Q1)        : ${IQR:,.0f}")
+print(f"Range              : ${range_price:,.0f}")
+print(f"Q1 (25th pct)      : ${Q1:,.0f}")
+print(f"Q3 (75th pct)      : ${Q3:,.0f}")
+print(f"\n💡 IQR is more robust than range for outlier detection")
+
+# ══════════════════════════════════════════════════════════════
+# CONCEPT 3: Skewness and Kurtosis
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("CONCEPT 3: Skewness and Kurtosis")
+print("="*50)
+
+skewness = price.skew()
+kurtosis = price.kurtosis()
+
+print(f"Skewness : {skewness:.2f}")
+print(f"Kurtosis : {kurtosis:.2f}")
+
+if skewness > 0:
+    print("💡 Positive skew → tail on RIGHT → mean > median")
+elif skewness < 0:
+    print("💡 Negative skew → tail on LEFT → mean < median")
+else:
+    print("💡 Symmetric distribution")
+
+# ══════════════════════════════════════════════════════════════
+# CONCEPT 4: Correlation
+# Most important for feature selection in ML!
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("CONCEPT 4: Correlation")
+print("="*50)
+
+num_cols = ['Price', 'Rooms', 'Distance', 'Bedroom2',
+            'Bathroom', 'Landsize', 'BuildingArea']
+num_cols = [c for c in num_cols if c in df.columns]
+
+corr_matrix = df[num_cols].corr().round(2)
+print("Correlation Matrix:")
+print(corr_matrix)
+
+# Correlation with Price specifically
+print("\nCorrelation with Price:")
+price_corr = corr_matrix['Price'].sort_values(ascending=False)
+print(price_corr)
+print("\n💡 Closer to 1 = strong positive correlation")
+print("   Closer to -1 = strong negative correlation")
+print("   Closer to 0  = no relationship")
+
+# ══════════════════════════════════════════════════════════════
+# CONCEPT 5: Hypothesis Testing
+# T-test — asked in data science interviews!
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("CONCEPT 5: Hypothesis Testing (T-Test)")
+print("="*50)
+
+# Question: Is there a significant difference in price
+# between houses with 2 rooms vs 3 rooms?
+rooms_2 = df[df['Rooms'] == 2]['Price'].dropna()
+rooms_3 = df[df['Rooms'] == 3]['Price'].dropna()
+
+t_stat, p_value = stats.ttest_ind(rooms_2, rooms_3)
+
+print(f"2-room avg price : ${rooms_2.mean():,.0f}")
+print(f"3-room avg price : ${rooms_3.mean():,.0f}")
+print(f"T-statistic      : {t_stat:.4f}")
+print(f"P-value          : {p_value:.6f}")
+
+if p_value < 0.05:
+    print("✅ p < 0.05 → SIGNIFICANT difference in price!")
+    print("   We REJECT the null hypothesis")
+else:
+    print("❌ p > 0.05 → NO significant difference")
+    print("   We FAIL TO REJECT the null hypothesis")
+
+print("\n💡 Rule: p < 0.05 = statistically significant")
+
+# ══════════════════════════════════════════════════════════════
+# CONCEPT 6: Normal Distribution + Z-score
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("CONCEPT 6: Z-Score (Standardization)")
+print("="*50)
+
+df['Price_Zscore'] = stats.zscore(df['Price'].fillna(df['Price'].median()))
+outliers = df[abs(df['Price_Zscore']) > 3]
+
+print(f"Total properties  : {len(df)}")
+print(f"Outliers (|z|>3)  : {len(outliers)}")
+print(f"\nSample Z-scores:")
+print(df[['Price', 'Price_Zscore']].head(8).to_string(index=False))
+print("\n💡 Z-score > 3 or < -3 = extreme outlier")
+
+# ══════════════════════════════════════════════════════════════
+# DASHBOARD: 4 statistics charts
+# ══════════════════════════════════════════════════════════════
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Statistics Analysis — Melbourne Housing',
+             fontsize=18, fontweight='bold')
+sns.set_style("whitegrid")
+
+# Chart 1: Distribution with mean/median lines
+axes[0, 0].hist(df['Price']/1000, bins=50,
+                color='#3498db', edgecolor='white', alpha=0.8)
+axes[0, 0].axvline(mean_price/1000, color='red',
+                   linestyle='--', linewidth=2, label=f'Mean: ${mean_price/1000:,.0f}K')
+axes[0, 0].axvline(median_price/1000, color='green',
+                   linestyle='--', linewidth=2, label=f'Median: ${median_price/1000:,.0f}K')
+axes[0, 0].set_title('Price Distribution with Mean & Median',
+                      fontweight='bold')
+axes[0, 0].set_xlabel('Price ($K)')
+axes[0, 0].set_ylabel('Count')
+axes[0, 0].legend()
+
+# Chart 2: Correlation heatmap
+sns.heatmap(corr_matrix, annot=True, fmt='.2f',
+            cmap='coolwarm', ax=axes[0, 1],
+            linewidths=0.5, center=0)
+axes[0, 1].set_title('Correlation Heatmap', fontweight='bold')
+
+# Chart 3: Boxplot — price by rooms
+room_data = df[df['Rooms'].between(1, 6)]
+sns.boxplot(data=room_data, x='Rooms', y='Price',
+            palette='Set2', ax=axes[1, 0])
+axes[1, 0].set_title('Price Distribution by Rooms (Boxplot)',
+                      fontweight='bold')
+axes[1, 0].set_xlabel('Number of Rooms')
+axes[1, 0].set_ylabel('Price ($)')
+
+# Chart 4: Z-score distribution
+axes[1, 1].hist(df['Price_Zscore'], bins=50,
+                color='#9b59b6', edgecolor='white', alpha=0.8)
+axes[1, 1].axvline(3,  color='red', linestyle='--',
+                   linewidth=2, label='z = +3')
+axes[1, 1].axvline(-3, color='red', linestyle='--',
+                   linewidth=2, label='z = -3')
+axes[1, 1].set_title('Z-Score Distribution (Outlier Detection)',
+                      fontweight='bold')
+axes[1, 1].set_xlabel('Z-Score')
+axes[1, 1].set_ylabel('Count')
+axes[1, 1].legend()
+
+plt.tight_layout()
+plt.savefig('statistics_dashboard.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+print("\n✅ Statistics dashboard saved!")
+print("\n📌 STATISTICS CHEAT SHEET FOR INTERVIEWS:")
+print("Mean        → average, affected by outliers")
+print("Median      → middle value, robust to outliers")
+print("Std Dev     → spread around mean")
+print("IQR         → spread of middle 50% of data")
+print("Correlation → relationship between two variables")
+print("P-value     → < 0.05 means significant result")
+print("Z-score     → how many std devs from mean")
