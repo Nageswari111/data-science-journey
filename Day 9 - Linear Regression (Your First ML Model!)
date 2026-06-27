@@ -1,0 +1,229 @@
+# Day 9 - Linear Regression (Your First ML Model!)
+# Goal: Predict house prices using Machine Learning
+# Tools: Pandas, NumPy, Scikit-learn, Matplotlib
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler
+
+# Load Melbourne clean dataset
+try:
+    df = pd.read_csv('melbourne_clean.csv')
+    print("✅ Loaded clean Melbourne dataset!")
+except:
+    url = "https://raw.githubusercontent.com/selva86/datasets/master/MelbourneHousing.csv"
+    df = pd.read_csv(url)
+    for col in ['Price', 'Rooms', 'Distance', 'Bedroom2',
+                'Bathroom', 'Car', 'Landsize', 'BuildingArea']:
+        if col in df.columns:
+            df[col].fillna(df[col].median(), inplace=True)
+    print("✅ Reloaded and cleaned Melbourne dataset!")
+
+print(f"Shape: {df.shape}\n")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 1: Select Features and Target
+# ══════════════════════════════════════════════════════════════
+print("="*50)
+print("STEP 1: Feature Selection")
+print("="*50)
+
+# Features (X) = inputs to the model
+# Target  (y) = what we want to predict
+features = ['Rooms', 'Distance', 'Bedroom2',
+            'Bathroom', 'Car', 'Landsize', 'BuildingArea']
+
+# Keep only columns that exist
+features = [f for f in features if f in df.columns]
+
+X = df[features].fillna(df[features].median())
+y = df['Price'].fillna(df['Price'].median())
+
+print(f"Features used : {features}")
+print(f"X shape       : {X.shape}")
+print(f"y shape       : {y.shape}")
+print(f"\nSample X:\n{X.head(3)}")
+print(f"\nSample y:\n{y.head(3)}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 2: Train Test Split
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 2: Train Test Split (80/20)")
+print("="*50)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+print(f"Training set   : {X_train.shape[0]} rows")
+print(f"Test set       : {X_test.shape[0]} rows")
+print(f"\n💡 We train on 80% and test on 20%")
+print(f"   random_state=42 means same split every time")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 3: Scale the features
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 3: Feature Scaling")
+print("="*50)
+
+scaler  = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled  = scaler.transform(X_test)
+
+print("Before scaling (Rooms vs BuildingArea):")
+print(X_train[['Rooms', 'BuildingArea']].describe().round(2))
+print("\nAfter scaling — all features on same scale ✅")
+print(f"Mean  ≈ 0, Std ≈ 1 for all columns")
+print(f"\n💡 Scaling prevents larger numbers dominating the model")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 4: Train the Model
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 4: Training Linear Regression Model")
+print("="*50)
+
+model = LinearRegression()
+model.fit(X_train_scaled, y_train)
+
+print("✅ Model trained!")
+print(f"\nIntercept (base price) : ${model.intercept_:,.0f}")
+print("\nFeature Coefficients:")
+coef_df = pd.DataFrame({
+    'Feature'    : features,
+    'Coefficient': model.coef_.round(2)
+}).sort_values('Coefficient', ascending=False)
+print(coef_df.to_string(index=False))
+print("\n💡 Higher coefficient = stronger influence on price")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 5: Make Predictions
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 5: Making Predictions")
+print("="*50)
+
+y_pred = model.predict(X_test_scaled)
+
+comparison = pd.DataFrame({
+    'Actual Price'   : y_test.values[:10],
+    'Predicted Price': y_pred[:10].round(0),
+    'Difference'     : (y_test.values[:10] - y_pred[:10]).round(0)
+})
+print("First 10 predictions vs actual:")
+print(comparison.to_string(index=False))
+
+# ══════════════════════════════════════════════════════════════
+# STEP 6: Evaluate the Model
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 6: Model Evaluation")
+print("="*50)
+
+mae  = mean_absolute_error(y_test, y_pred)
+mse  = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+r2   = r2_score(y_test, y_pred)
+
+print(f"MAE  (Mean Absolute Error)  : ${mae:,.0f}")
+print(f"RMSE (Root Mean Sq Error)   : ${rmse:,.0f}")
+print(f"R²   (R-squared Score)      : {r2:.4f}")
+print(f"\n💡 R² = {r2:.2f} means model explains")
+print(f"   {r2*100:.1f}% of price variation")
+print(f"\n💡 MAE = ${mae:,.0f} means on average")
+print(f"   our predictions are off by ${mae:,.0f}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 7: Predict a brand new house!
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 7: Predict Price of a New House")
+print("="*50)
+
+new_house = pd.DataFrame([{
+    'Rooms'       : 3,
+    'Distance'    : 10,
+    'Bedroom2'    : 3,
+    'Bathroom'    : 2,
+    'Car'         : 1,
+    'Landsize'    : 500,
+    'BuildingArea': 150
+}])
+new_house = new_house[features]
+new_house_scaled = scaler.transform(new_house)
+predicted_price  = model.predict(new_house_scaled)[0]
+
+print("House details:")
+print(f"  Rooms        : 3")
+print(f"  Distance     : 10 km from city")
+print(f"  Bathrooms    : 2")
+print(f"  Land size    : 500 sqm")
+print(f"  Building area: 150 sqm")
+print(f"\n🏠 Predicted Price: ${predicted_price:,.0f}")
+
+# ══════════════════════════════════════════════════════════════
+# DASHBOARD: 4 ML charts
+# ══════════════════════════════════════════════════════════════
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle('Linear Regression — House Price Prediction',
+             fontsize=18, fontweight='bold')
+sns.set_style("whitegrid")
+
+# Chart 1: Actual vs Predicted
+axes[0, 0].scatter(y_test, y_pred, alpha=0.4,
+                   color='#3498db', edgecolors='none', s=20)
+min_val = min(y_test.min(), y_pred.min())
+max_val = max(y_test.max(), y_pred.max())
+axes[0, 0].plot([min_val, max_val], [min_val, max_val],
+                'r--', linewidth=2, label='Perfect prediction')
+axes[0, 0].set_title('Actual vs Predicted Price', fontweight='bold')
+axes[0, 0].set_xlabel('Actual Price ($)')
+axes[0, 0].set_ylabel('Predicted Price ($)')
+axes[0, 0].legend()
+
+# Chart 2: Residuals plot
+residuals = y_test - y_pred
+axes[0, 1].scatter(y_pred, residuals, alpha=0.4,
+                   color='#e74c3c', edgecolors='none', s=20)
+axes[0, 1].axhline(0, color='black', linestyle='--', linewidth=2)
+axes[0, 1].set_title('Residuals Plot', fontweight='bold')
+axes[0, 1].set_xlabel('Predicted Price ($)')
+axes[0, 1].set_ylabel('Residual (Actual - Predicted)')
+
+# Chart 3: Feature importance
+colors = ['#2ecc71' if c > 0 else '#e74c3c' for c in coef_df['Coefficient']]
+axes[1, 0].barh(coef_df['Feature'], coef_df['Coefficient'],
+                color=colors, edgecolor='black')
+axes[1, 0].set_title('Feature Coefficients', fontweight='bold')
+axes[1, 0].set_xlabel('Coefficient Value')
+axes[1, 0].axvline(0, color='black', linewidth=1)
+
+# Chart 4: Distribution of residuals
+axes[1, 1].hist(residuals, bins=50, color='#9b59b6',
+                edgecolor='white', alpha=0.8)
+axes[1, 1].axvline(0, color='red', linestyle='--', linewidth=2)
+axes[1, 1].set_title('Distribution of Residuals', fontweight='bold')
+axes[1, 1].set_xlabel('Residual Value')
+axes[1, 1].set_ylabel('Count')
+
+plt.tight_layout()
+plt.savefig('linear_regression_dashboard.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+print("\n✅ Linear Regression dashboard saved!")
+print("\n📌 ML CHEAT SHEET FOR INTERVIEWS:")
+print("train_test_split  → split data before training")
+print("StandardScaler    → scale features to same range")
+print("model.fit()       → train the model")
+print("model.predict()   → make predictions")
+print("R² score          → how well model fits (0 to 1)")
+print("MAE               → average prediction error")
+print("RMSE              → penalises large errors more")
+print("Residuals         → actual - predicted values")
