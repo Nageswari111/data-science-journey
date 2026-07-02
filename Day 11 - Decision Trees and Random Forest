@@ -1,0 +1,271 @@
+# Day 11 - Decision Trees and Random Forest
+# Goal: Build and compare two powerful ML models
+# Tools: Pandas, Scikit-learn, Matplotlib, Seaborn
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import (accuracy_score, confusion_matrix,
+                             classification_report, roc_auc_score)
+from sklearn.preprocessing import StandardScaler
+
+# Load Titanic dataset
+url  = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+df   = pd.read_csv(url)
+
+print("✅ Titanic dataset loaded!")
+print(f"Shape: {df.shape}\n")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 1: Data Preparation (same as Day 10)
+# ══════════════════════════════════════════════════════════════
+print("="*50)
+print("STEP 1: Data Preparation")
+print("="*50)
+
+df['Age'].fillna(df['Age'].median(), inplace=True)
+df['Embarked'].fillna(df['Embarked'].mode()[0], inplace=True)
+df['Fare'].fillna(df['Fare'].median(), inplace=True)
+
+df['Sex_encoded']      = df['Sex'].map({'male': 0, 'female': 1})
+df['Embarked_encoded'] = df['Embarked'].map({'S': 0, 'C': 1, 'Q': 2})
+df['FamilySize']       = df['SibSp'] + df['Parch'] + 1
+df['IsAlone']          = (df['FamilySize'] == 1).astype(int)
+df['Title']            = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
+df['Title']            = df['Title'].replace(
+    ['Lady','Countess','Capt','Col','Don','Dr',
+     'Major','Rev','Sir','Jonkheer','Dona'], 'Rare')
+df['Title']            = df['Title'].replace(
+    {'Mlle': 'Miss', 'Ms': 'Miss', 'Mme': 'Mrs'})
+df['Title_encoded']    = df['Title'].map(
+    {'Mr': 0, 'Miss': 1, 'Mrs': 2, 'Master': 3, 'Rare': 4}).fillna(0)
+
+features = ['Pclass', 'Sex_encoded', 'Age', 'Fare',
+            'Embarked_encoded', 'FamilySize', 'IsAlone', 'Title_encoded']
+
+X = df[features]
+y = df['Survived']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print(f"Features  : {features}")
+print(f"Train rows: {X_train.shape[0]}")
+print(f"Test rows : {X_test.shape[0]}")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 2: Decision Tree
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 2: Decision Tree Classifier")
+print("="*50)
+
+dt_model = DecisionTreeClassifier(
+    max_depth=5,
+    min_samples_split=10,
+    min_samples_leaf=5,
+    random_state=42
+)
+dt_model.fit(X_train, y_train)
+dt_pred     = dt_model.predict(X_test)
+dt_accuracy = accuracy_score(y_test, dt_pred)
+dt_auc      = roc_auc_score(y_test,
+               dt_model.predict_proba(X_test)[:, 1])
+dt_cv       = cross_val_score(dt_model, X_train,
+               y_train, cv=5).mean()
+
+print(f"✅ Decision Tree trained!")
+print(f"Accuracy       : {dt_accuracy*100:.2f}%")
+print(f"AUC Score      : {dt_auc:.4f}")
+print(f"CV Mean Acc    : {dt_cv*100:.2f}%")
+print(f"Tree depth     : {dt_model.get_depth()}")
+print(f"Total leaves   : {dt_model.get_n_leaves()}")
+
+print(f"\nDecision Tree — Classification Report:")
+print(classification_report(y_test, dt_pred,
+      target_names=['Did Not Survive', 'Survived']))
+
+# ══════════════════════════════════════════════════════════════
+# STEP 3: Random Forest
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 3: Random Forest Classifier")
+print("="*50)
+
+rf_model = RandomForestClassifier(
+    n_estimators=100,
+    max_depth=6,
+    min_samples_split=10,
+    min_samples_leaf=4,
+    random_state=42,
+    n_jobs=-1
+)
+rf_model.fit(X_train, y_train)
+rf_pred     = rf_model.predict(X_test)
+rf_accuracy = accuracy_score(y_test, rf_pred)
+rf_auc      = roc_auc_score(y_test,
+               rf_model.predict_proba(X_test)[:, 1])
+rf_cv       = cross_val_score(rf_model, X_train,
+               y_train, cv=5).mean()
+
+print(f"✅ Random Forest trained!")
+print(f"Accuracy       : {rf_accuracy*100:.2f}%")
+print(f"AUC Score      : {rf_auc:.4f}")
+print(f"CV Mean Acc    : {rf_cv*100:.2f}%")
+print(f"Trees built    : {rf_model.n_estimators}")
+
+print(f"\nRandom Forest — Classification Report:")
+print(classification_report(y_test, rf_pred,
+      target_names=['Did Not Survive', 'Survived']))
+
+# ══════════════════════════════════════════════════════════════
+# STEP 4: Feature Importance
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 4: Feature Importance")
+print("="*50)
+
+importance_df = pd.DataFrame({
+    'Feature'  : features,
+    'DT_Importance' : dt_model.feature_importances_.round(4),
+    'RF_Importance' : rf_model.feature_importances_.round(4)
+}).sort_values('RF_Importance', ascending=False)
+
+print("Feature Importance (Random Forest vs Decision Tree):")
+print(importance_df.to_string(index=False))
+print("\n💡 Higher = more important for prediction")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 5: Model Comparison Table
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 5: Model Comparison")
+print("="*50)
+
+comparison = pd.DataFrame({
+    'Model'   : ['Decision Tree', 'Random Forest'],
+    'Accuracy': [f"{dt_accuracy*100:.2f}%", f"{rf_accuracy*100:.2f}%"],
+    'AUC'     : [f"{dt_auc:.4f}", f"{rf_auc:.4f}"],
+    'CV Score': [f"{dt_cv*100:.2f}%", f"{rf_cv*100:.2f}%"]
+})
+print(comparison.to_string(index=False))
+
+if rf_accuracy > dt_accuracy:
+    print(f"\n✅ Random Forest wins by "
+          f"{(rf_accuracy - dt_accuracy)*100:.2f}%")
+    print("💡 Random Forest almost always beats a single Decision Tree")
+    print("   because it combines 100 trees and averages their votes")
+
+# ══════════════════════════════════════════════════════════════
+# STEP 6: Predict new passengers
+# ══════════════════════════════════════════════════════════════
+print("\n" + "="*50)
+print("STEP 6: Predict New Passengers")
+print("="*50)
+
+new_passengers = pd.DataFrame([
+    {'Pclass': 1, 'Sex_encoded': 1, 'Age': 28, 'Fare': 100,
+     'Embarked_encoded': 1, 'FamilySize': 2,
+     'IsAlone': 0, 'Title_encoded': 2},
+    {'Pclass': 3, 'Sex_encoded': 0, 'Age': 22, 'Fare': 7.5,
+     'Embarked_encoded': 0, 'FamilySize': 1,
+     'IsAlone': 1, 'Title_encoded': 0},
+    {'Pclass': 2, 'Sex_encoded': 0, 'Age': 35, 'Fare': 25,
+     'Embarked_encoded': 0, 'FamilySize': 3,
+     'IsAlone': 0, 'Title_encoded': 0},
+])
+
+descriptions = [
+    "1st class female, age 28, with family",
+    "3rd class male, age 22, alone",
+    "2nd class male, age 35, with family"
+]
+
+rf_probs = rf_model.predict_proba(new_passengers)[:, 1]
+rf_preds = rf_model.predict(new_passengers)
+
+print(f"{'Passenger':<35} {'Prediction':<20} {'Probability'}")
+print("-" * 65)
+for desc, pred, prob in zip(descriptions, rf_preds, rf_probs):
+    result = "Survived ✅" if pred == 1 else "Did Not Survive ❌"
+    print(f"{desc:<35} {result:<20} {prob*100:.1f}%")
+
+# ══════════════════════════════════════════════════════════════
+# DASHBOARD: 4 charts
+# ══════════════════════════════════════════════════════════════
+fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+fig.suptitle('Decision Tree vs Random Forest — Titanic',
+             fontsize=18, fontweight='bold')
+sns.set_style("whitegrid")
+
+# Chart 1: Decision Tree visualization
+plot_tree(dt_model, feature_names=features,
+          class_names=['Did Not Survive', 'Survived'],
+          filled=True, rounded=True, fontsize=7,
+          ax=axes[0, 0], max_depth=3)
+axes[0, 0].set_title('Decision Tree Structure (depth=3)',
+                      fontweight='bold')
+
+# Chart 2: Feature Importance comparison
+x      = np.arange(len(features))
+width  = 0.35
+axes[0, 1].bar(x - width/2, importance_df['DT_Importance'],
+               width, label='Decision Tree', color='#3498db',
+               edgecolor='black')
+axes[0, 1].bar(x + width/2, importance_df['RF_Importance'],
+               width, label='Random Forest', color='#e74c3c',
+               edgecolor='black')
+axes[0, 1].set_title('Feature Importance Comparison',
+                      fontweight='bold')
+axes[0, 1].set_xticks(x)
+axes[0, 1].set_xticklabels(importance_df['Feature'],
+                             rotation=45, ha='right')
+axes[0, 1].legend()
+
+# Chart 3: Confusion matrices side by side
+dt_cm = confusion_matrix(y_test, dt_pred)
+rf_cm = confusion_matrix(y_test, rf_pred)
+combined_cm = np.hstack([dt_cm, rf_cm])
+sns.heatmap(pd.DataFrame(combined_cm,
+    index=['Actual: No', 'Actual: Yes'],
+    columns=['DT: No', 'DT: Yes', 'RF: No', 'RF: Yes']),
+    annot=True, fmt='d', cmap='Blues',
+    ax=axes[1, 0], linewidths=1, cbar=False)
+axes[1, 0].set_title('Confusion Matrix — DT vs RF',
+                      fontweight='bold')
+
+# Chart 4: Model accuracy comparison
+models     = ['Decision Tree', 'Random Forest']
+accuracies = [dt_accuracy * 100, rf_accuracy * 100]
+bars = axes[1, 1].bar(models, accuracies,
+                       color=['#3498db', '#e74c3c'],
+                       edgecolor='black', width=0.4)
+axes[1, 1].set_title('Model Accuracy Comparison',
+                      fontweight='bold')
+axes[1, 1].set_ylabel('Accuracy (%)')
+axes[1, 1].set_ylim(75, 95)
+for bar, acc in zip(bars, accuracies):
+    axes[1, 1].text(bar.get_x() + bar.get_width()/2,
+                    bar.get_height() + 0.2,
+                    f'{acc:.2f}%', ha='center',
+                    fontweight='bold', fontsize=12)
+
+plt.tight_layout()
+plt.savefig('decision_tree_rf_dashboard.png',
+            dpi=150, bbox_inches='tight')
+plt.show()
+
+print("\n✅ Dashboard saved!")
+print("\n📌 DECISION TREE vs RANDOM FOREST CHEAT SHEET:")
+print("Decision Tree  → easy to understand, can overfit")
+print("Random Forest  → 100 trees, harder to overfit")
+print("n_estimators   → number of trees in forest")
+print("max_depth      → controls overfitting")
+print("feature_importances_ → which features matter most")
+print("Overfitting    → model memorises training data")
+print("Underfitting   → model too simple to learn patterns")
